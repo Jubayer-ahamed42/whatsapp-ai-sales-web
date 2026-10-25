@@ -1,0 +1,16 @@
+{
+  "name": "Instant WhatsApp AI Sales Rep Engine",
+  "short_name": "AI Sales Rep",
+  "description": "Autonomous 24/7 WhatsApp AI Sales Closer for E-Commerce by Be Smart With AI",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#008069",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
