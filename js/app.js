@@ -237,6 +237,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // Render Active Store Details & Ingested Products List
   function renderActiveStoreDetails() {
     const store = catalogEngine.getCurrentStore();
@@ -251,19 +261,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const products = catalogEngine.getAllProducts();
 
       products.forEach(p => {
+        let safeImgUrl = p.image || '';
+        if (/^\s*javascript:/i.test(safeImgUrl)) {
+          safeImgUrl = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600';
+        }
+        const safeImg = escapeHtml(safeImgUrl);
+        const safeTitle = escapeHtml(p.titleBn || p.title || 'Product');
+        const safePrice = Number(p.price || 0).toLocaleString();
+        const safeOrigPrice = Number(p.originalPrice || 0).toLocaleString();
+        const safeDiscount = Number(p.discountPercent || 0);
+
         const itemEl = document.createElement('div');
         itemEl.className = 'group p-2.5 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 rounded-xl transition cursor-pointer flex items-center space-x-3';
         itemEl.innerHTML = `
-          <img src="${p.image}" alt="${p.title}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-slate-600/50">
+          <img src="${safeImg}" alt="${safeTitle}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-slate-600/50">
           <div class="flex-1 min-w-0">
             <h5 class="text-xs font-semibold text-slate-200 group-hover:text-emerald-400 transition truncate">
-              ${p.titleBn || p.title}
+              ${safeTitle}
             </h5>
             <div class="flex items-center space-x-2 mt-0.5">
-              <span class="text-xs font-bold text-emerald-400">৳${p.price.toLocaleString()}</span>
-              <span class="text-[10px] text-slate-400 line-through">৳${p.originalPrice.toLocaleString()}</span>
+              <span class="text-xs font-bold text-emerald-400">৳${safePrice}</span>
+              <span class="text-[10px] text-slate-400 line-through">৳${safeOrigPrice}</span>
               <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono">
-                ${p.discountPercent}% OFF
+                ${safeDiscount}% OFF
               </span>
             </div>
           </div>

@@ -448,45 +448,60 @@ class WhatsAppSimulator {
 
   renderProductCardInChat(product, isAttached = false) {
     const cardId = 'pcard-' + Date.now() + Math.floor(Math.random()*100);
+    
+    // XSS sanitization
+    let safeImgUrl = product.image || '';
+    if (/^\s*javascript:/i.test(safeImgUrl)) {
+      safeImgUrl = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600';
+    }
+    const safeImg = this.escapeHtml(safeImgUrl);
+    const safeTitle = this.escapeHtml(product.titleBn || product.title || 'Product');
+    const safeDesc = this.escapeHtml(product.shortDesc || product.specs || '');
+    const safeId = this.escapeHtml(String(product.id || 'p-0'));
+    const safePrice = Number(product.price || 0).toLocaleString();
+    const safeOrigPrice = Number(product.originalPrice || 0).toLocaleString();
+    const safeDiscount = Number(product.discountPercent || 0);
+    const safeSavings = Math.max(0, Number(product.originalPrice || 0) - Number(product.price || 0)).toLocaleString();
+
     const cardHtml = `
       <div id="${cardId}" class="flex flex-col items-start space-y-1 mb-2 max-w-[85%] animate-fadeIn">
         <div class="bg-white rounded-2xl overflow-hidden shadow-md border border-slate-200/90 w-full transition hover:shadow-lg">
           
           <!-- Product Image & Badges -->
           <div class="relative w-full h-44 bg-slate-100 overflow-hidden group">
-            <img src="${product.image}" alt="${product.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+            <img src="${safeImg}" alt="${safeTitle}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
             <div class="absolute top-2 left-2 bg-emerald-600/95 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full shadow backdrop-blur-xs flex items-center space-x-1">
               <span>✅ স্টকে আছে</span>
             </div>
             <div class="absolute top-2 right-2 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow">
-              ${product.discountPercent}% OFF
+              ${safeDiscount}% OFF
             </div>
           </div>
 
           <!-- Card Details -->
           <div class="p-3.5 space-y-2">
             <h4 class="font-semibold text-slate-900 text-sm leading-snug line-clamp-2">
-              ${product.titleBn || product.title}
+              ${safeTitle}
             </h4>
             
             <p class="text-xs text-slate-500 line-clamp-2">
-              ${product.shortDesc || product.specs}
+              ${safeDesc}
             </p>
 
             <!-- Price Row -->
             <div class="flex items-baseline space-x-2 pt-0.5">
-              <span class="text-emerald-700 font-bold text-lg">৳ ${product.price.toLocaleString()}</span>
-              <span class="text-slate-400 line-through text-xs">৳ ${product.originalPrice.toLocaleString()}</span>
+              <span class="text-emerald-700 font-bold text-lg">৳ ${safePrice}</span>
+              <span class="text-slate-400 line-through text-xs">৳ ${safeOrigPrice}</span>
               <span class="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                (সাশ্রয় ৳ ${(product.originalPrice - product.price).toLocaleString()})
+                (সাশ্রয় ৳ ${safeSavings})
               </span>
             </div>
 
             <!-- Instant COD Order CTA Button -->
             <button 
               class="wa-order-btn w-full bg-[#00a884] hover:bg-[#008f72] text-white py-2 px-3 rounded-xl font-medium text-xs flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 transition"
-              data-product-id="${product.id}"
-              data-product-title="${product.titleBn || product.title}"
+              data-product-id="${safeId}"
+              data-product-title="${safeTitle}"
             >
               <span>⚡ Order Now with COD</span>
               <span class="text-[11px] opacity-90">(ক্যাশ অন ডেলিভারি)</span>

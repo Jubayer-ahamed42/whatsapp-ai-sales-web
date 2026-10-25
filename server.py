@@ -15,6 +15,8 @@ import json
 import urllib.request
 import urllib.parse
 import re
+import socket
+import ipaddress
 
 if sys.platform == 'win32':
     try:
@@ -25,6 +27,43 @@ if sys.platform == 'win32':
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8085
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def is_safe_url(target_url):
+    """
+    SSRF Protection: Validates target URL against private IPs, localhost,
+    and metadata services.
+    """
+    try:
+        parsed = urllib.parse.urlparse(target_url)
+        if parsed.scheme not in ('http', 'https'):
+            return False, "Only HTTP and HTTPS protocols are allowed"
+        
+        hostname = parsed.hostname
+        if not hostname:
+            return False, "Invalid target host"
+        
+        # Block internal/cloud metadata names
+        blocked_names = {
+            'localhost', 'loopback', 'metadata.google.internal',
+            'instance-data', '169.254.169.254'
+        }
+        if hostname.lower() in blocked_names:
+            return False, "Access to internal hostnames is prohibited"
+
+        # Resolve IP and verify it is not private/reserved
+        try:
+            ip_str = socket.gethostbyname(hostname)
+            ip_obj = ipaddress.ip_address(ip_str)
+            if (ip_obj.is_private or ip_obj.is_loopback or 
+                ip_obj.is_link_local or ip_obj.is_reserved or 
+                ip_obj.is_multicast):
+                return False, "Access to private or local IP addresses is prohibited"
+        except socket.gaierror:
+            return False, "Hostname could not be resolved"
+
+        return True, ""
+    except Exception:
+        return False, "URL validation error"
 
 class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -45,7 +84,7 @@ class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
         # Scrape endpoint for real-time live domain catalog inspection
         if path == '/api/scrape':
             query = urllib.parse.parse_qs(parsed.query)
-            target_url = query.get('url', [''])[0]
+            target_url = query.get('url', [''])[0].strip()
             if not target_url:
                 self.send_response(400)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -53,8 +92,17 @@ class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({'error': 'Missing url parameter'}).encode('utf-8'))
                 return
 
-            if not target_url.startswith('http'):
+            if not target_url.startswith(('http://', 'https://')):
                 target_url = 'https://' + target_url
+
+            # SSRF Security Validation
+            is_safe, reason = is_safe_url(target_url)
+            if not is_safe:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': f'Security policy blocked target: {reason}'}).encode('utf-8'))
+                return
 
             scraped_data = self.scrape_site(target_url)
             self.send_response(200)
@@ -145,8 +193,8 @@ class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
                 og_img = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\'](.*?)["\']', html, re.IGNORECASE)
                 if og_img:
                     result['ogImage'] = og_img.group(1).strip()
-        except Exception as e:
-            result['error'] = str(e)
+        except Exception:
+            result['error'] = 'Unable to reach or parse target store'
 
         return result
 
