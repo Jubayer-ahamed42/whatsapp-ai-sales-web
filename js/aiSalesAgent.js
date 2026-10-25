@@ -193,22 +193,25 @@ class AISalesAgent {
     const policy = store.deliveryPolicy || { dhakaCost: 60, outsideCost: 120 };
     const p = this.currentOrderState.product || this.catalog.getAllProducts()[0];
 
-    // If customer asks a question instead of providing address/phone, don't trigger fake order!
-    const isQuestion = /[?]|কত|কখন|কবে|চার্জ|ডেলিভারি|ছাড়|ডিসকাউন্ট|সাইজ|কালার|koto|kobe|charge|delivery|discount|size/i.test(text);
-    const phoneMatch = text.match(/(?:01|8801)[3-9]\d{8}/);
-    const hasExplicitContact = /(?:নাম|name)\s*[:=]|(?:ঠিকানা|address)\s*[:=]|(?:ফোন|মোবাইল|phone)\s*[:=]|(?:রোড|road)\s*\d+|(?:বাসা|বাড়ি|house)\s*\d+/i.test(text);
+    // Clean text for phone extraction (handle spaces, dashes, +88 prefix)
+    const normalizedDigits = text.replace(/[\s\-()]/g, '');
+    const phoneRawMatch = normalizedDigits.match(/(?:\+?88)?(01[3-9]\d{8})/);
+    const phone = phoneRawMatch ? phoneRawMatch[1] : null;
 
-    // If it's a question and lacks a phone number and explicit contact structure, route back to question handlers
-    if (isQuestion && !phoneMatch && !hasExplicitContact) {
+    // Detect if customer is asking a question instead of submitting address/order
+    const isQuestion = /[?]|কত|কখন|কবে|কোথায়|কোথায়|চার্জ|ডেলিভারি|ছাড়|ডিসকাউন্ট|সাইজ|কালার|রং|স্টক|দোকান|শপ|শোরুম|কেমন|আসল|নকল|ফেরত|চেক|koto|kobe|charge|delivery|discount|size|color|colour|stock|shop|showroom/i.test(text);
+    const hasExplicitContact = /(?:নাম|name)\s*[:=]|(?:ঠিকানা|address)\s*[:=]|(?:ফোন|মোবাইল|phone)\s*[:=]|(?:রোড|road)\s*\d+|(?:বাসা|বাড়ি|বাড়ি|house)\s*\d+/i.test(text);
+
+    // If it's a question and lacks a phone number, route back to question handlers
+    if (isQuestion && !phone) {
       return null;
     }
 
-    const hasAddressMarkers = /(?:নাম|ফোন|মোবাইল|ঠিকানা|রোড|বাসা|হাউজ|সেক্টর|গ্রাম|উপজেলা|থানা|জেলা|মিরপুর|ধানমন্ডি|উত্তরা|বনানী|গুলশান|মোহাম্মদপুর|বসুন্ধরা|address|road|house|sector|village)/i.test(text);
+    const hasAddressMarkers = /(?:নাম|ফোন|মোবাইল|ঠিকানা|রোড|বাসা|বাড়ি|বাড়ি|হাউজ|সেক্টর|গ্রাম|উপজেলা|থানা|জেলা|মিরপুর|ধানমন্ডি|উত্তরা|বনানী|গুলশান|মোহাম্মদপুর|বসুন্ধরা|address|road|house|sector|village)/i.test(text);
 
-    // Require either a phone number OR explicit contact structure OR clear address markers with length >= 12
-    if (phoneMatch || hasExplicitContact || (hasAddressMarkers && text.length >= 12)) {
-      const phone = phoneMatch ? phoneMatch[0] : (text.match(/\d{5,}/) ? text.match(/\d{5,}/)[0] : 'ফোন নম্বর সংরক্ষিত');
-      const isOutside = /(চট্টগ্রাম|সিলেট|রাজশাহী|খুলনা|বরিশাল|রংপুর|কুমিল্লা|বগুড়া|ময়মনসিংহ|গাজীপুর|নারায়ণগঞ্জ|বাইরে|outside|district|village|গ্রাম)/i.test(text);
+    // If genuine phone number is present with address/contact markers or structured details
+    if (phone && (hasExplicitContact || hasAddressMarkers || text.length >= 10)) {
+      const isOutside = /(চট্টগ্রাম|সিলেট|রাজশাহী|খুলনা|বরিশাল|রংপুর|কুমিল্লা|বগুড়া|বগুড়া|ময়মনসিংহ|ময়মনসিংহ|গাজীপুর|নারায়ণগঞ্জ|নারায়ণগঞ্জ|বাইরে|outside|district|village|গ্রাম)/i.test(text);
       const deliveryCharge = isOutside ? policy.outsideCost : policy.dhakaCost;
       const totalAmount = p.price + deliveryCharge;
       const orderId = 'BSW-' + Math.floor(100000 + Math.random() * 900000);
@@ -219,6 +222,15 @@ class AISalesAgent {
         text: `আলহামদুলিল্লাহ! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে! 🎊\n\n📋 **অর্ডার রসিদ / সামারি:**\n━━━━━━━━━━━━━━━━━━\n🆔 **অর্ডার আইডি:** #${orderId}\n🛍️ **পণ্য:** ${p.titleBn || p.title}\n💰 **মূল্য:** ৳${p.price.toLocaleString()}\n🚚 **ডেলিভারি চার্জ:** ৳${deliveryCharge} (${isOutside ? 'ঢাকার বাইরে' : 'ঢাকা সিটি'})\n💵 **সর্বমোট প্রদেয় (COD):** ৳${totalAmount.toLocaleString()} (পণ্য হাতে পেয়ে পরিশোধ করবেন)\n📱 **যোগাযোগ:** ${phone}\n━━━━━━━━━━━━━━━━━━\nআমাদের লজিস্টিক টিম পার্সেলটি প্যাক করে ট্র্যাকিং আইডি সহ আপনাকে মেসেজ পাঠাবে। ধন্যবাদ! 🌸`,
         productCard: null,
         isOrderSummary: true
+      };
+    }
+
+    // If user provided an address or name but forgot their phone number
+    if (hasExplicitContact || (hasAddressMarkers && text.length >= 12 && !isQuestion)) {
+      return {
+        text: `ধন্যবাদ! আপনার ডেলিভারি তথ্য পেয়েছি। ক্যাশ অন ডেলিভারি অর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার **১১ ডিজিটের মোবাইল নম্বরটি** (যেমন: ০১৭১১২২৩৩৪৪) লিখে পাঠিয়ে দিন! 📱`,
+        productCard: p,
+        isOrderSummary: false
       };
     }
 

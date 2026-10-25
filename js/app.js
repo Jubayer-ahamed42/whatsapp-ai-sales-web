@@ -261,8 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const products = catalogEngine.getAllProducts();
 
       products.forEach(p => {
-        let safeImgUrl = p.image || '';
-        if (/^\s*javascript:/i.test(safeImgUrl)) {
+        let safeImgUrl = String(p.image || '').trim();
+        if (/^(?:javascript|data|vbscript|file):/i.test(safeImgUrl) || !safeImgUrl) {
           safeImgUrl = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600';
         }
         const safeImg = escapeHtml(safeImgUrl);

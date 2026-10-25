@@ -30,12 +30,24 @@ class WhatsAppSimulator {
     this.sendInitialWelcomeMessage();
   }
 
+  sanitizeUrl(url) {
+    if (!url) return '';
+    const trimmed = String(url).trim();
+    if (/^(?:javascript|data|vbscript|file):/i.test(trimmed)) {
+      return '';
+    }
+    return trimmed;
+  }
+
   updateStore(newStore) {
     this.currentStore = newStore;
     const headerTitle = this.container.querySelector('.wa-store-title');
     const headerAvatar = this.container.querySelector('.wa-store-avatar');
     if (headerTitle) headerTitle.textContent = newStore.shortName || newStore.name;
-    if (headerAvatar) headerAvatar.src = newStore.avatar;
+    if (headerAvatar) {
+      const safeAvatar = this.sanitizeUrl(newStore.avatar) || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=150';
+      headerAvatar.src = safeAvatar;
+    }
     this.clearMessages();
     this.sendInitialWelcomeMessage();
   }
@@ -132,14 +144,14 @@ class WhatsAppSimulator {
           <div class="flex items-center space-x-3">
             <div class="relative">
               <img class="wa-store-avatar w-10 h-10 rounded-full object-cover border border-white/30 shadow-sm" 
-                   src="${store.avatar}" 
-                   alt="${store.name}">
+                   src="${this.escapeHtml(this.sanitizeUrl(store.avatar) || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=150')}" 
+                   alt="${this.escapeHtml(store.name || 'Store')}">
               <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#25D366] border-2 border-[#075e54] rounded-full"></span>
             </div>
             <div class="leading-tight">
               <div class="flex items-center space-x-1.5">
                 <span class="wa-store-title font-semibold text-sm tracking-wide text-white drop-shadow-sm">
-                  ${store.shortName || store.name}
+                  ${this.escapeHtml(store.shortName || store.name || 'Store')}
                 </span>
                 <!-- Official WhatsApp Green Verified Tick Badge -->
                 <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#25D366] text-white flex-shrink-0 shadow-xs" title="অফিশিয়াল ভেরিফাইড বিজনেস অ্যাকাউন্ট">
@@ -278,7 +290,7 @@ class WhatsAppSimulator {
       <div class="flex flex-col items-start space-y-1 mb-2">
         <div class="bg-white text-slate-800 rounded-2xl rounded-tl-sm px-3.5 py-2.5 max-w-[85%] shadow-sm border border-slate-200/80 relative text-[13.5px] leading-relaxed">
           <p class="font-medium text-emerald-800 mb-1">
-            আসসালামু আলাইকুম! **${store.name}**-এ আপনাকে আন্তরিক স্বাগতম! 🌸
+            আসসালামু আলাইকুম! **${this.escapeHtml(store.name || 'Store')}**-এ আপনাকে আন্তরিক স্বাগতম! 🌸
           </p>
           <p class="text-slate-700">
             আমাদের অফিশিয়াল ক্যাটালগ থেকে যেকোনো প্রোডাক্ট, ডিসকাউন্ট অফার, সাইজ বা ডেলিভারি তথ্য জানতে এখানে সরাসরি মেসেজ করুন।
@@ -450,8 +462,8 @@ class WhatsAppSimulator {
     const cardId = 'pcard-' + Date.now() + Math.floor(Math.random()*100);
     
     // XSS sanitization
-    let safeImgUrl = product.image || '';
-    if (/^\s*javascript:/i.test(safeImgUrl)) {
+    let safeImgUrl = this.sanitizeUrl(product.image);
+    if (!safeImgUrl) {
       safeImgUrl = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600';
     }
     const safeImg = this.escapeHtml(safeImgUrl);
@@ -565,7 +577,7 @@ class WhatsAppSimulator {
                 <div class="waveform-bar w-1 bg-slate-300 rounded-full h-5 transition-all duration-150"></div>
               </div>
               <div class="flex justify-between items-center text-[10px] text-slate-400 font-medium">
-                <span class="vn-time">${voiceData.duration || '0:14'}</span>
+                <span class="vn-time">${this.escapeHtml(voiceData.duration || '0:14')}</span>
                 <span class="flex items-center space-x-1 text-emerald-600">
                   <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
                     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
@@ -577,7 +589,7 @@ class WhatsAppSimulator {
 
           </div>
           <p class="text-[11px] text-slate-500 mt-2 border-t border-slate-100 pt-1.5 italic">
-            ${voiceData.previewText || 'AI Sales Rep ভয়েস প্রিভিউ'}
+            ${this.escapeHtml(voiceData.previewText || 'AI Sales Rep ভয়েস প্রিভিউ')}
           </p>
         </div>
       </div>
@@ -743,7 +755,8 @@ class WhatsAppSimulator {
   }
 
   escapeHtml(str) {
-    return str
+    if (str == null) return '';
+    return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')

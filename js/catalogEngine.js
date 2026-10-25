@@ -588,11 +588,15 @@ class CatalogEngine {
 
   cleanDomain(input) {
     if (!input) return '';
-    let domain = input.trim().toLowerCase();
+    let domain = String(input).trim().toLowerCase();
+    if (/^(?:javascript|data|vbscript|file):/i.test(domain)) {
+      return 'custom-store.com';
+    }
     domain = domain.replace(/^https?:\/\//, '');
     domain = domain.replace(/^www\./, '');
-    domain = domain.split('/')[0];
-    return domain;
+    domain = domain.split(/[/?#]/)[0];
+    domain = domain.replace(/[^a-z0-9.\-_]/g, '');
+    return domain || 'custom-store.com';
   }
 
   setStoreByDomain(inputUrl) {
@@ -1005,7 +1009,12 @@ class CatalogEngine {
   // Bengali inflection stemmer helper
   getBengaliStem(word) {
     if (!word || word.length < 3) return word;
-    const suffixes = ['গুলোর', 'গুলো', 'গুলা', 'খানা', 'খানি', 'টার', 'টের', 'টির', 'টা', 'টি', 'দের', 'এর', 'কে', 'তে', 'রে', 'র'];
+    // Suffixes ordered by length descending. Note: replacing 'টের' with 'ের' to preserve root word consonants (e.g. জ্যাকেটের -> জ্যাকেট, শার্টের -> শার্ট)
+    const suffixes = [
+      'গুলোতেই', 'গুলোতে', 'গুলোরও', 'গুলোর', 'গুলোই', 'গুলার', 'গুলো', 'গুলা',
+      'টারও', 'টিরও', 'টিতে', 'টার', 'টির', 'টায়', 'টাই', 'টিই', 'টাও', 'টিও', 'টা', 'টি',
+      'খানা', 'খানি', 'দের', 'য়ের', 'ের', 'রে', 'কে', 'তে', 'র'
+    ];
     for (const suf of suffixes) {
       if (word.endsWith(suf) && word.length - suf.length >= 2) {
         return word.slice(0, word.length - suf.length);
@@ -1017,9 +1026,9 @@ class CatalogEngine {
   findProducts(userQuery) {
     if (!userQuery || !this.activeProducts.length) return [];
     
-    // Clean and normalize query text
+    // Clean and normalize query text with comprehensive Bengali & Unicode punctuation
     const cleanQ = userQuery
-      .replace(/[?!.,।;:()'"\[\]{}_+\-*\/\\#@$%^&=~`]/g, ' ')
+      .replace(/[?!.,।॥;:()'"“”‘’\[\]{}_+\-*\/\\#@$%^&=~`…—–]/g, ' ')
       .toLowerCase()
       .trim();
 
@@ -1033,27 +1042,33 @@ class CatalogEngine {
 
     // Banglish transliteration map to boost match accuracy
     const synonyms = {
-      'tshirt': 'টি-শার্ট', 't-shirt': 'টি-শার্ট', 'tee': 'টি-শার্ট',
-      'shirt': 'শার্ট', 'polo': 'পোলো',
-      'hoodie': 'হুডি', 'winter': 'উইন্টার',
+      'tshirt': 'টি-শার্ট', 't-shirt': 'টি-শার্ট', 'tee': 'টি-শার্ট', 'tshrt': 'টি-শার্ট', 't-shart': 'টি-শার্ট',
+      'shirt': 'শার্ট', 'shart': 'শার্ট', 'polo': 'পোলো',
+      'hoodie': 'হুডি', 'hoody': 'হুডি', 'hudi': 'হুডি', 'winter': 'উইন্টার',
+      'jacket': 'জ্যাকেট', 'jackets': 'জ্যাকেট',
       'pant': 'প্যান্ট', 'pants': 'প্যান্ট', 'chino': 'চিনো',
       'panjabi': 'পাঞ্জাবি', 'punjabi': 'পাঞ্জাবি',
       'perfume': 'পারফিউম', 'attar': 'আতর', 'oud': 'উদ',
-      'watch': 'ঘড়ি', 'smartwatch': 'স্মার্টওয়াচ',
+      'watch': 'ঘড়ি', 'ghori': 'ঘড়ি', 'smartwatch': 'স্মার্টওয়াচ',
       'airpods': 'এয়ারপডস', 'earbuds': 'ইয়ারবাডস', 'headphone': 'হেডফোন',
       'charger': 'চার্জার', 'powerbank': 'পাওয়ার ব্যাংক',
-      'shoe': 'জুতা', 'shoes': 'জুতা', 'sneaker': 'স্নিকার্স', 'loafer': 'লোফার',
-      'saree': 'শাড়ি', 'jamdani': 'জামদানি',
-      'honey': 'মধু', 'ghee': 'ঘি', 'khejur': 'খেজুর',
+      'shoe': 'জুতা', 'shoes': 'জুতা', 'sneaker': 'স্নিকার্স', 'loafer': 'লোফার', 'juta': 'জুতা',
+      'saree': 'শাড়ি', 'shari': 'শাড়ি', 'sharee': 'শাড়ি', 'jamdani': 'জামদানি',
+      'kurti': 'কুর্তি', 'kurtis': 'কুর্তি',
+      'borkha': 'বোরকা', 'burqa': 'বোরকা', 'abaya': 'আবায়া',
+      'honey': 'মধু', 'modhu': 'মধু', 'ghee': 'ঘি', 'khejur': 'খেজুর',
       'serum': 'সিরাম', 'sunscreen': 'সানস্ক্রিন', 'cleanser': 'ক্লিনজার',
-      'chair': 'চেয়ার', 'bottle': 'বোতল', 'wallet': 'ওয়ালেট'
+      'chair': 'চেয়ার', 'bottle': 'বোতল', 'wallet': 'ওয়ালেট', 'bag': 'ব্যাগ'
     };
 
     // Generic stop words in Bengali & Banglish that shouldn't match products on their own
     const stopWords = new Set([
       'এই', 'কি', 'কী', 'আছে', 'হবে', 'কেমন', 'বলুন', 'একটু', 'দাও', 'দেখান', 'জানতে', 
       'চাই', 'দাম', 'কত', 'কতো', 'প্রাইস', 'সম্পর্কে', 'নাকি', 'এবং', 'বা', 'না', 
-      'koto', 'dam', 'price', 'ache', 'hobe', 'kemon', 'bolun', 'chai', 'dehan', 'eta', 'ei'
+      'টা', 'টি', 'টার', 'টির', 'গুলো', 'গুলা', 'গুলোর', 'তে', 'কে', 'এর', 'ও', 'তো',
+      'koto', 'dam', 'price', 'ache', 'ase', 'aseh', 'hobe', 'kemon', 'bolun', 'chai', 
+      'dehan', 'dekhaw', 'dekan', 'eta', 'ei', 'eita', 'oita', 'ta', 'ti', 'tar', 'tir', 
+      'gulo', 'gula', 'ki', 'kee', 'bhai', 'vai', 'bro', 'sir'
     ]);
 
     const rawTokens = cleanQ.split(/\s+/).filter(w => w.length > 1);
