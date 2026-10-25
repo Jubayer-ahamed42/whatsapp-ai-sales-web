@@ -193,40 +193,83 @@ class AISalesAgent {
     const policy = store.deliveryPolicy || { dhakaCost: 60, outsideCost: 120 };
     const p = this.currentOrderState.product || this.catalog.getAllProducts()[0];
 
-    // Clean text for phone extraction (handle spaces, dashes, +88 prefix)
-    const normalizedDigits = text.replace(/[\s\-()]/g, '');
+    // Clean text for phone extraction (handle spaces, dashes, dots, +88 prefix)
+    const normalizedDigits = text.replace(/[\s\-.()/]/g, '');
     const phoneRawMatch = normalizedDigits.match(/(?:\+?88)?(01[3-9]\d{8})/);
     const phone = phoneRawMatch ? phoneRawMatch[1] : null;
 
+    if (phone) {
+      this.currentOrderState.phone = phone;
+    }
+
     // Detect if customer is asking a question instead of submitting address/order
     const isQuestion = /[?]|কত|কখন|কবে|কোথায়|কোথায়|চার্জ|ডেলিভারি|ছাড়|ডিসকাউন্ট|সাইজ|কালার|রং|স্টক|দোকান|শপ|শোরুম|কেমন|আসল|নকল|ফেরত|চেক|koto|kobe|charge|delivery|discount|size|color|colour|stock|shop|showroom/i.test(text);
-    const hasExplicitContact = /(?:নাম|name)\s*[:=]|(?:ঠিকানা|address)\s*[:=]|(?:ফোন|মোবাইল|phone)\s*[:=]|(?:রোড|road)\s*\d+|(?:বাসা|বাড়ি|বাড়ি|house)\s*\d+/i.test(text);
 
-    // If it's a question and lacks a phone number, route back to question handlers
-    if (isQuestion && !phone) {
+    // If it's a question, route back to question handlers (even if phone was mentioned, phone is saved)
+    if (isQuestion) {
       return null;
     }
 
-    const hasAddressMarkers = /(?:নাম|ফোন|মোবাইল|ঠিকানা|রোড|বাসা|বাড়ি|বাড়ি|হাউজ|সেক্টর|গ্রাম|উপজেলা|থানা|জেলা|মিরপুর|ধানমন্ডি|উত্তরা|বনানী|গুলশান|মোহাম্মদপুর|বসুন্ধরা|address|road|house|sector|village)/i.test(text);
+    // Extract Customer Name if labeled
+    const nameMatch = rawText.match(/(?:নাম|name)\s*[:=]\s*([^\n,।]+)/i);
+    if (nameMatch) {
+      this.currentOrderState.customerName = nameMatch[1].trim();
+    }
 
-    // If genuine phone number is present with address/contact markers or structured details
-    if (phone && (hasExplicitContact || hasAddressMarkers || text.length >= 10)) {
-      const isOutside = /(চট্টগ্রাম|সিলেট|রাজশাহী|খুলনা|বরিশাল|রংপুর|কুমিল্লা|বগুড়া|বগুড়া|ময়মনসিংহ|ময়মনসিংহ|গাজীপুর|নারায়ণগঞ্জ|নারায়ণগঞ্জ|বাইরে|outside|district|village|গ্রাম)/i.test(text);
+    const hasExplicitContact = /(?:নাম|name)\s*[:=]|(?:ঠিকানা|address)\s*[:=]|(?:ফোন|মোবাইল|phone)\s*[:=]|(?:রোড|road)\s*\d+|(?:বাসা|বাড়ি|বাড়ি|house)\s*\d+/i.test(text);
+    const hasAddressMarkers = /(?:ঠিকানা|রোড|বাসা|বাড়ি|বাড়ি|হাউজ|সেক্টর|গ্রাম|উপজেলা|থানা|জেলা|মিরপুর|ধানমন্ডি|উত্তরা|বনানী|গুলশান|মোহাম্মদপুর|বসুন্ধরা|address|road|house|sector|village)/i.test(text);
+
+    // Extract address text if address markers exist or non-phone text has sufficient substance
+    const nonPhoneText = text.replace(/(?:\+?88)?01[3-9]\d{8}/g, '').replace(/(?:ফোন|মোবাইল|phone)\s*[:=]?/gi, '').trim();
+    if (hasAddressMarkers || hasExplicitContact || nonPhoneText.length >= 8) {
+      let candidate = rawText;
+      if (nameMatch) {
+        candidate = candidate.replace(nameMatch[0], '');
+      }
+      if (phone) {
+        candidate = candidate.replace(new RegExp(`(?:\\+?88)?${phone}`, 'g'), '');
+      }
+      candidate = candidate.replace(/(?:ফোন|মোবাইল|phone|নাম|name)\s*[:=]?/gi, '').trim();
+      candidate = candidate.replace(/^[,\s।;:]+|[,\s।;:]+$/g, '');
+      if (candidate.length >= 4) {
+        this.currentOrderState.address = candidate;
+      }
+    }
+
+    const currentPhone = this.currentOrderState.phone;
+    const currentAddress = this.currentOrderState.address;
+
+    // Case 1: Both genuine phone number AND delivery address are present -> Complete Order!
+    if (currentPhone && currentAddress) {
+      const fullLocation = currentAddress + ' ' + text;
+      const isOutside = /(চট্টগ্রাম|সিলেট|রাজশাহী|খুলনা|বরিশাল|রংপুর|কুমিল্লা|বগুড়া|বগুড়া|ময়মনসিংহ|ময়মনসিংহ|গাজীপুর|নারায়ণগঞ্জ|নারায়ণগঞ্জ|বাইরে|outside|district|village|গ্রাম)/i.test(fullLocation);
       const deliveryCharge = isOutside ? policy.outsideCost : policy.dhakaCost;
       const totalAmount = p.price + deliveryCharge;
       const orderId = 'BSW-' + Math.floor(100000 + Math.random() * 900000);
 
       this.currentOrderState.inProgress = false; // Order completed successfully!
 
+      const nameDisplay = this.currentOrderState.customerName ? `\n👤 **গ্রাহক:** ${this.currentOrderState.customerName}` : '';
+      const addressDisplay = currentAddress ? `\n📍 **ঠিকানা:** ${currentAddress}` : '';
+
       return {
-        text: `আলহামদুলিল্লাহ! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে! 🎊\n\n📋 **অর্ডার রসিদ / সামারি:**\n━━━━━━━━━━━━━━━━━━\n🆔 **অর্ডার আইডি:** #${orderId}\n🛍️ **পণ্য:** ${p.titleBn || p.title}\n💰 **মূল্য:** ৳${p.price.toLocaleString()}\n🚚 **ডেলিভারি চার্জ:** ৳${deliveryCharge} (${isOutside ? 'ঢাকার বাইরে' : 'ঢাকা সিটি'})\n💵 **সর্বমোট প্রদেয় (COD):** ৳${totalAmount.toLocaleString()} (পণ্য হাতে পেয়ে পরিশোধ করবেন)\n📱 **যোগাযোগ:** ${phone}\n━━━━━━━━━━━━━━━━━━\nআমাদের লজিস্টিক টিম পার্সেলটি প্যাক করে ট্র্যাকিং আইডি সহ আপনাকে মেসেজ পাঠাবে। ধন্যবাদ! 🌸`,
+        text: `আলহামদুলিল্লাহ! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে! 🎊\n\n📋 **অর্ডার রসিদ / সামারি:**\n━━━━━━━━━━━━━━━━━━\n🆔 **অর্ডার আইডি:** #${orderId}\n🛍️ **পণ্য:** ${p.titleBn || p.title}${nameDisplay}\n📱 **যোগাযোগ:** ${currentPhone}${addressDisplay}\n💰 **মূল্য:** ৳${p.price.toLocaleString()}\n🚚 **ডেলিভারি চার্জ:** ৳${deliveryCharge} (${isOutside ? 'ঢাকার বাইরে' : 'ঢাকা সিটি'})\n💵 **সর্বমোট প্রদেয় (COD):** ৳${totalAmount.toLocaleString()} (পণ্য হাতে পেয়ে পরিশোধ করবেন)\n━━━━━━━━━━━━━━━━━━\nআমাদের লজিস্টিক টিম পার্সেলটি প্যাক করে ট্র্যাকিং আইডি সহ আপনাকে মেসেজ পাঠাবে। ধন্যবাদ! 🌸`,
         productCard: null,
         isOrderSummary: true
       };
     }
 
-    // If user provided an address or name but forgot their phone number
-    if (hasExplicitContact || (hasAddressMarkers && text.length >= 12 && !isQuestion)) {
+    // Case 2: User provided phone number but address is still missing
+    if (currentPhone && !currentAddress) {
+      return {
+        text: `ধন্যবাদ! আপনার মোবাইল নম্বর (${currentPhone}) সংরক্ষিত হয়েছে। ক্যাশ অন ডেলিভারি অর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার **সম্পূর্ণ ডেলিভারি ঠিকানা** (বাসা/রোড, এলাকা ও জেলা) লিখে জানিয়ে দিন! 📦`,
+        productCard: p,
+        isOrderSummary: false
+      };
+    }
+
+    // Case 3: User provided address/name but phone number is still missing
+    if (!currentPhone && (currentAddress || hasAddressMarkers || hasExplicitContact)) {
       return {
         text: `ধন্যবাদ! আপনার ডেলিভারি তথ্য পেয়েছি। ক্যাশ অন ডেলিভারি অর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার **১১ ডিজিটের মোবাইল নম্বরটি** (যেমন: ০১৭১১২২৩৩৪৪) লিখে পাঠিয়ে দিন! 📱`,
         productCard: p,

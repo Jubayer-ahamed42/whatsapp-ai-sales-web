@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function escapeHtml(str) {
-    if (!str) return '';
+    if (str == null) return '';
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -261,8 +261,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const products = catalogEngine.getAllProducts();
 
       products.forEach(p => {
-        let safeImgUrl = String(p.image || '').trim();
-        if (/^(?:javascript|data|vbscript|file):/i.test(safeImgUrl) || !safeImgUrl) {
+        let safeImgUrl = String(p.image || '').replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
+        if (/^(?:javascript|vbscript|file):/i.test(safeImgUrl) || !safeImgUrl) {
+          safeImgUrl = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600';
+        } else if (/^data:/i.test(safeImgUrl) && !/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,/i.test(safeImgUrl)) {
           safeImgUrl = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600';
         }
         const safeImg = escapeHtml(safeImgUrl);

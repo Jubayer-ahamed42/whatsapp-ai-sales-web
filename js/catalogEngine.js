@@ -588,7 +588,7 @@ class CatalogEngine {
 
   cleanDomain(input) {
     if (!input) return '';
-    let domain = String(input).trim().toLowerCase();
+    let domain = String(input).replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim().toLowerCase();
     if (/^(?:javascript|data|vbscript|file):/i.test(domain)) {
       return 'custom-store.com';
     }
@@ -1043,13 +1043,15 @@ class CatalogEngine {
     // Banglish transliteration map to boost match accuracy
     const synonyms = {
       'tshirt': 'টি-শার্ট', 't-shirt': 'টি-শার্ট', 'tee': 'টি-শার্ট', 'tshrt': 'টি-শার্ট', 't-shart': 'টি-শার্ট',
+      'টিশার্ট': 'টি-শার্ট', 'টিশার্টের': 'টি-শার্ট', 'টিশার্টটা': 'টি-শার্ট', 'টিশার্টগুলো': 'টি-শার্ট',
       'shirt': 'শার্ট', 'shart': 'শার্ট', 'polo': 'পোলো',
       'hoodie': 'হুডি', 'hoody': 'হুডি', 'hudi': 'হুডি', 'winter': 'উইন্টার',
       'jacket': 'জ্যাকেট', 'jackets': 'জ্যাকেট',
-      'pant': 'প্যান্ট', 'pants': 'প্যান্ট', 'chino': 'চিনো',
+      'pant': 'প্যান্ট', 'pants': 'প্যান্ট', 'chino': 'চিনো', 'trouser': 'ট্রাউজার', 'trousers': 'ট্রাউজার',
       'panjabi': 'পাঞ্জাবি', 'punjabi': 'পাঞ্জাবি',
       'perfume': 'পারফিউম', 'attar': 'আতর', 'oud': 'উদ',
-      'watch': 'ঘড়ি', 'ghori': 'ঘড়ি', 'smartwatch': 'স্মার্টওয়াচ',
+      'watch': 'ঘড়ি', 'ghori': 'ঘড়ি', 'watches': 'ঘড়ি', 'smartwatch': 'স্মার্টওয়াচ',
+      'ঘড়ি': 'ওয়াচ', 'ঘড়ির': 'ওয়াচ', 'ঘড়িটা': 'ওয়াচ', 'ঘড়িগুলো': 'ওয়াচ', 'ওয়াচ': 'ঘড়ি',
       'airpods': 'এয়ারপডস', 'earbuds': 'ইয়ারবাডস', 'headphone': 'হেডফোন',
       'charger': 'চার্জার', 'powerbank': 'পাওয়ার ব্যাংক',
       'shoe': 'জুতা', 'shoes': 'জুতা', 'sneaker': 'স্নিকার্স', 'loafer': 'লোফার', 'juta': 'জুতা',
@@ -1058,7 +1060,7 @@ class CatalogEngine {
       'borkha': 'বোরকা', 'burqa': 'বোরকা', 'abaya': 'আবায়া',
       'honey': 'মধু', 'modhu': 'মধু', 'ghee': 'ঘি', 'khejur': 'খেজুর',
       'serum': 'সিরাম', 'sunscreen': 'সানস্ক্রিন', 'cleanser': 'ক্লিনজার',
-      'chair': 'চেয়ার', 'bottle': 'বোতল', 'wallet': 'ওয়ালেট', 'bag': 'ব্যাগ'
+      'chair': 'চেয়ার', 'চেয়ার': 'চেয়ার', 'bottle': 'বোতল', 'wallet': 'ওয়ালেট', 'মানিব্যাগ': 'ওয়ালেট', 'bag': 'ব্যাগ'
     };
 
     // Generic stop words in Bengali & Banglish that shouldn't match products on their own
@@ -1084,6 +1086,9 @@ class CatalogEngine {
         if (synonyms[t]) {
           searchTokens.push(synonyms[t]);
         }
+        if (synonyms[stem]) {
+          searchTokens.push(synonyms[stem]);
+        }
       }
     }
 
@@ -1097,13 +1102,22 @@ class CatalogEngine {
       let score = 0;
       const titleLower = (p.title || '').toLowerCase();
       const titleBnLower = (p.titleBn || '').toLowerCase();
+      const titleCleanBn = titleBnLower.replace(/[-_]/g, ' ');
+      const titleNoHyphenBn = titleBnLower.replace(/[-_]/g, '');
+      const titleCleanEn = titleLower.replace(/[-_]/g, ' ');
+      const titleNoHyphenEn = titleLower.replace(/[-_]/g, '');
       const catLower = (p.category || '').toLowerCase();
       const descLower = ((p.shortDesc || '') + ' ' + (p.specs || '')).toLowerCase();
       const variantsLower = [...(p.colors || []), ...(p.sizes || [])].join(' ').toLowerCase();
 
       for (const token of searchTokens) {
-        // High weight: product title matches token or stem
-        if (titleBnLower.includes(token) || titleLower.includes(token)) {
+        const tokenNoHyphen = token.replace(/[-_]/g, '');
+        const tokenClean = token.replace(/[-_]/g, ' ');
+
+        // High weight: product title matches token or stem (including hyphen-free variants)
+        if (titleBnLower.includes(token) || titleLower.includes(token) ||
+            titleCleanBn.includes(tokenClean) || titleCleanEn.includes(tokenClean) ||
+            (tokenNoHyphen.length >= 3 && (titleNoHyphenBn.includes(tokenNoHyphen) || titleNoHyphenEn.includes(tokenNoHyphen)))) {
           score += 10;
         } else if (token.length >= 3 && (titleBnLower.includes(token.slice(0, -1)) || titleLower.includes(token.slice(0, -1)))) {
           score += 7;

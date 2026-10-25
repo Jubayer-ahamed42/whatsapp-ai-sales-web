@@ -18,6 +18,8 @@ import urllib.error
 import re
 import socket
 import ipaddress
+import html
+import gzip
 
 if sys.platform == 'win32':
     try:
@@ -35,6 +37,7 @@ CGNAT_NET = ipaddress.ip_network('100.64.0.0/10')
 # Explicitly blocked cloud metadata IPs and hostnames
 BLOCKED_IPS = {
     '169.254.169.254',  # AWS, Azure, GCP metadata
+    '169.254.170.2',    # AWS ECS task metadata
     '100.100.100.200',  # Alibaba Cloud metadata
     '0.0.0.0',
     '127.0.0.1',
@@ -88,10 +91,10 @@ def is_safe_url(target_url):
                 if str(ip_obj) in BLOCKED_IPS:
                     return False, f"Access to cloud metadata IP '{ip_str}' is prohibited"
 
-                # Check private, loopback, link-local, reserved, multicast, unspecified
+                # Check private, loopback, link-local, site-local, reserved, multicast, unspecified
                 if (ip_obj.is_private or ip_obj.is_loopback or 
-                    ip_obj.is_link_local or ip_obj.is_reserved or 
-                    ip_obj.is_multicast or ip_obj.is_unspecified):
+                    ip_obj.is_link_local or getattr(ip_obj, 'is_site_local', False) or
+                    ip_obj.is_reserved or ip_obj.is_multicast or ip_obj.is_unspecified):
                     return False, f"Access to private/local/reserved IP '{ip_str}' is prohibited"
 
                 # Check Carrier-Grade NAT (100.64.0.0/10) for IPv4
@@ -186,11 +189,30 @@ class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
             'products': [],
             'platform': 'custom'
         }
-        
+
+        def extract_meta_tag(html_source, attr_name, attr_val):
+            # Matches regardless of attribute order: property/name before content, or content before property/name
+            escaped_val = re.escape(attr_val)
+            pattern1 = re.compile(
+                r'<meta[^>]+(?:' + attr_name + r')=[\x22\x27]' + escaped_val + r'[\x22\x27][^>]+content=[\x22\x27](.*?)[\x22\x27]',
+                re.IGNORECASE
+            )
+            m = pattern1.search(html_source)
+            if m:
+                return html.unescape(m.group(1).strip())
+            pattern2 = re.compile(
+                r'<meta[^>]+content=[\x22\x27](.*?)[\x22\x27][^>]+(?:' + attr_name + r')=[\x22\x27]' + escaped_val + r'[\x22\x27]',
+                re.IGNORECASE
+            )
+            m2 = pattern2.search(html_source)
+            if m2:
+                return html.unescape(m2.group(1).strip())
+            return ''
+
         # 1. Try Shopify standard public API: /products.json?limit=8
-        base_url = url.rstrip('/')
         try:
-            shopify_url = base_url + '/products.json?limit=8'
+            parsed_target = urllib.parse.urlparse(url)
+            shopify_url = f"{parsed_target.scheme}://{parsed_target.netloc}/products.json?limit=8"
             s_is_safe, _ = is_safe_url(shopify_url)
             if s_is_safe:
                 s_req = urllib.request.Request(
@@ -200,19 +222,30 @@ class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
                 with safe_opener.open(s_req, timeout=3.5) as s_resp:
                     if s_resp.status == 200:
                         raw_data = s_resp.read(512 * 1024)  # Limit 512KB
+                        if raw_data.startswith(b'\x1f\x8b'):
+                            try:
+                                raw_data = gzip.decompress(raw_data)
+                            except Exception:
+                                pass
                         s_data = json.loads(raw_data.decode('utf-8', errors='ignore'))
                         if 'products' in s_data and isinstance(s_data['products'], list) and len(s_data['products']) > 0:
                             result['platform'] = 'shopify'
                             for idx, sp in enumerate(s_data['products'][:8]):
-                                p_title = sp.get('title', 'Shopify Product')
+                                p_title = html.unescape(sp.get('title') or 'Shopify Product')
                                 p_variant = (sp.get('variants') or [{}])[0]
-                                p_price = float(p_variant.get('price') or 990)
-                                p_compare = float(p_variant.get('compare_at_price') or (p_price * 1.25))
+                                try:
+                                    p_price = float(p_variant.get('price') or 990)
+                                except (ValueError, TypeError):
+                                    p_price = 990.0
+                                try:
+                                    p_compare = float(p_variant.get('compare_at_price') or (p_price * 1.25))
+                                except (ValueError, TypeError):
+                                    p_compare = p_price * 1.25
                                 p_img = ''
                                 if sp.get('images') and len(sp['images']) > 0:
                                     p_img = sp['images'][0].get('src', '')
                                 clean_desc = re.sub(r'<[^>]+>', ' ', sp.get('body_html') or '')
-                                clean_desc = ' '.join(clean_desc.split())[:120]
+                                clean_desc = html.unescape(' '.join(clean_desc.split()))[:120]
                                 result['products'].append({
                                     'id': f"shopify-{sp.get('id', idx)}",
                                     'title': p_title,
@@ -240,26 +273,36 @@ class SalesEngineHandler(http.server.SimpleHTTPRequestHandler):
             )
             with safe_opener.open(req, timeout=4.0) as response:
                 html_bytes = response.read(256 * 1024)  # Limit 256KB to prevent memory exhaustion
-                html = html_bytes.decode('utf-8', errors='ignore')
+                if html_bytes.startswith(b'\x1f\x8b'):
+                    try:
+                        html_bytes = gzip.decompress(html_bytes)
+                    except Exception:
+                        pass
+                html_text = html_bytes.decode('utf-8', errors='ignore')
 
                 # Extract title
-                title_match = re.search(r'<meta[^>]*property=["\']og:title["\'][^>]*content=["\'](.*?)["\']', html, re.IGNORECASE)
-                if not title_match:
-                    title_match = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
-                if title_match:
-                    result['title'] = title_match.group(1).strip()
+                og_title = extract_meta_tag(html_text, 'property', 'og:title')
+                if not og_title:
+                    og_title = extract_meta_tag(html_text, 'name', 'twitter:title')
+                if not og_title:
+                    title_match = re.search(r'<title[^>]*>(.*?)</title>', html_text, re.IGNORECASE | re.DOTALL)
+                    if title_match:
+                        og_title = html.unescape(title_match.group(1).strip())
+                result['title'] = og_title
 
                 # Extract meta description
-                desc_match = re.search(r'<meta[^>]*property=["\']og:description["\'][^>]*content=["\'](.*?)["\']', html, re.IGNORECASE)
-                if not desc_match:
-                    desc_match = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\'](.*?)["\']', html, re.IGNORECASE)
-                if desc_match:
-                    result['description'] = desc_match.group(1).strip()
+                og_desc = extract_meta_tag(html_text, 'property', 'og:description')
+                if not og_desc:
+                    og_desc = extract_meta_tag(html_text, 'name', 'description')
+                if not og_desc:
+                    og_desc = extract_meta_tag(html_text, 'name', 'twitter:description')
+                result['description'] = og_desc
 
                 # Extract og:image
-                og_img = re.search(r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\'](.*?)["\']', html, re.IGNORECASE)
-                if og_img:
-                    result['ogImage'] = og_img.group(1).strip()
+                og_img = extract_meta_tag(html_text, 'property', 'og:image')
+                if not og_img:
+                    og_img = extract_meta_tag(html_text, 'name', 'twitter:image')
+                result['ogImage'] = og_img
         except Exception:
             result['error'] = 'Unable to reach or parse target store'
 

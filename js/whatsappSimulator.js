@@ -32,11 +32,16 @@ class WhatsAppSimulator {
 
   sanitizeUrl(url) {
     if (!url) return '';
-    const trimmed = String(url).trim();
-    if (/^(?:javascript|data|vbscript|file):/i.test(trimmed)) {
+    const cleaned = String(url).replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
+    if (/^(?:javascript|vbscript|file):/i.test(cleaned)) {
       return '';
     }
-    return trimmed;
+    if (/^data:/i.test(cleaned)) {
+      if (!/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,/i.test(cleaned)) {
+        return '';
+      }
+    }
+    return cleaned;
   }
 
   updateStore(newStore) {
@@ -288,9 +293,9 @@ class WhatsAppSimulator {
     // Initial greeting bubble from store AI
     const welcomeBubble = `
       <div class="flex flex-col items-start space-y-1 mb-2">
-        <div class="bg-white text-slate-800 rounded-2xl rounded-tl-sm px-3.5 py-2.5 max-w-[85%] shadow-sm border border-slate-200/80 relative text-[13.5px] leading-relaxed">
+        <div class="bg-white wa-tail-in text-slate-800 rounded-2xl rounded-tl-none px-3.5 py-2.5 max-w-[85%] shadow-sm border border-slate-200/80 relative text-[13.5px] leading-relaxed">
           <p class="font-medium text-emerald-800 mb-1">
-            আসসালামু আলাইকুম! **${this.escapeHtml(store.name || 'Store')}**-এ আপনাকে আন্তরিক স্বাগতম! 🌸
+            আসসালামু আলাইকুম! <strong>${this.escapeHtml(store.name || 'Store')}</strong>-এ আপনাকে আন্তরিক স্বাগতম! 🌸
           </p>
           <p class="text-slate-700">
             আমাদের অফিশিয়াল ক্যাটালগ থেকে যেকোনো প্রোডাক্ট, ডিসকাউন্ট অফার, সাইজ বা ডেলিভারি তথ্য জানতে এখানে সরাসরি মেসেজ করুন।
