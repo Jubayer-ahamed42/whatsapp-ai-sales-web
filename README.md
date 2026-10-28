@@ -1,4 +1,4 @@
-# ⚡ Instant WhatsApp AI Sales Rep Engine (সেলস ইঞ্জিন)
+# ⚡ WhatsApp AI Sales Rep — Web Platform & Sandbox (সেলস ওয়েব প্ল্যাটফর্ম)
 
 <p align="center">
   <img src="favicon.svg" alt="WhatsApp AI Sales Rep" width="96" height="96" />
@@ -10,7 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com"><img src="https://img.shields.io/badge/GitHub%20Pages-Ready%20to%20Deploy-brightgreen?style=for-the-badge&logo=github" alt="GitHub Pages Ready" /></a>
+  <a href="https://github.com/Jubayer-ahamed42/whatsapp-ai-sales-web"><img src="https://img.shields.io/badge/GitHub-whatsapp--ai--sales--web-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Repo" /></a>
+  <a href="https://jubayer-ahamed42.github.io/whatsapp-ai-sales-web/"><img src="https://img.shields.io/badge/Live_Demo-Online-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
   <a href="https://github.com"><img src="https://img.shields.io/badge/GitHub%20Stars-★%20128-gold?style=for-the-badge&logo=github" alt="GitHub Stars" /></a>
   <a href="https://wa.me/8801610594042"><img src="https://img.shields.io/badge/WhatsApp-Jubayer%20Ahamed-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="WhatsApp" /></a>
