@@ -231,13 +231,13 @@ python server.py 8085
    git add .
    git commit -m "feat: complete standalone whatsapp ai sales rep engine"
    git branch -M main
-   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   git remote add origin https://github.com/Jubayer-ahamed42/whatsapp-ai-sales-web.git
    git push -u origin main
    ```
 3. GitHub রিপোজিটরির **Settings** > **Pages** ট্যাবে যান।
 4. **Build and deployment** > **Source** হিসেবে `Deploy from a branch` সিলেক্ট করুন।
 5. **Branch** হিসেবে `main` এবং ফোল্ডার হিসেবে `/ (root)` সিলেক্ট করে **Save** দিন।
-6. ১-২ মিনিটের মধ্যে আপনার ওয়েবসাইট লাইভ হয়ে যাবে: `https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/`
+6. ১-২ মিনিটের মধ্যে আপনার ওয়েবসাইট লাইভ হয়ে যাবে: `https://jubayer-ahamed42.github.io/whatsapp-ai-sales-web/`
 
 ### Vercel-এ ডেপ্লয় করার নিয়ম:
 1. [vercel.com](https://vercel.com)-এ লগইন করে **Add New Project** সিলেক্ট করুন।
