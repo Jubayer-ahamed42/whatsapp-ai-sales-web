@@ -13,7 +13,6 @@
   <a href="https://github.com/Jubayer-ahamed42/whatsapp-ai-sales-web"><img src="https://img.shields.io/badge/GitHub-whatsapp--ai--sales--web-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Repo" /></a>
   <a href="https://jubayer-ahamed42.github.io/whatsapp-ai-sales-web/"><img src="https://img.shields.io/badge/Live_Demo-Online-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com"><img src="https://img.shields.io/badge/GitHub%20Stars-★%20128-gold?style=for-the-badge&logo=github" alt="GitHub Stars" /></a>
   <a href="https://wa.me/8801610594042"><img src="https://img.shields.io/badge/WhatsApp-Jubayer%20Ahamed-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="WhatsApp" /></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/Dependencies-Zero%20(Pure%20Vanilla%20JS)-orange?style=for-the-badge" alt="Zero Dependencies" /></a>
   <a href="#meta-cloud-api"><img src="https://img.shields.io/badge/Architecture-Meta%20Cloud%20API%202026-teal?style=for-the-badge" alt="Meta Cloud API" /></a>
@@ -298,7 +297,7 @@ sales-engine/
 
 ## 🔗 মূল এজেন্সিতে ইন্টিগ্রেশন (Integration with Main Agency)
 
-পরবর্তীতে যখন এটি মূল এজেন্সি ওয়েবসাইট `besmartwithai.agency`-তে লিংক করা হবে:
+পরবর্তীতে যখন এটি মূল এজেন্সি ওয়েবসাইট `jubayer-ahamed.vercel.app`-তে লিংক করা হবে:
 1. **স্বতন্ত্র ওয়েবসাইট হিসেবে লিংক:** এজেন্সি সাইটের হিরো বা সার্ভিস সেকশন থেকে সরাসরি একটি "লাইভ টেস্ট করুন" বোতামের মাধ্যমে এই সাইটে ট্রাফিক পাঠানো যাবে।
 2. **এম্বেডেড আইফ্রেম বা সাব-ডিরেক্টরি:** চাইলে মূল সাইটের `/sales-engine/` রুটেও এটি অপরিবর্তিতভাবে সংযুক্ত করা যাবে।
 3. সমস্ত আইডি ও সিএসএস ভ্যারিয়েবল নেমস্পেসড থাকায় কোনো কনফ্লিক্ট সৃষ্টি হবে না।
@@ -308,7 +307,7 @@ sales-engine/
 ## 👨‍💻 লেখক ও যোগাযোগ (Author & Agency)
 
 - **উদ্যোক্তা ও সিস্টেম আর্কিটেক্ট:** জুবায়ের আহামেদ (Jubayer Ahamed)
-- **এজেন্সি:** [Be Smart With AI](https://besmartwithai.agency)
+- **এজেন্সি:** [Be Smart With AI](https://jubayer-ahamed.vercel.app)
 - **অফিশিয়াল হোয়াটসঅ্যাপ:** [+8801610594042](https://wa.me/8801610594042)
 - **লাইসেন্স:** [MIT License](LICENSE)
 
